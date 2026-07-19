@@ -6,6 +6,11 @@ import Dashboard from "./pages/Dashboard";
 import CrudPage from "./pages/CrudPage";
 import PromoBannerPage from "./pages/PromoBannerPage";
 import FooterPage from "./pages/FooterPage";
+import AICommandCenter from "./pages/AICommandCenter";
+import LeadsPage from "./pages/LeadsPage";
+import CallCenterPage from "./pages/CallCenterPage";
+import ChatAnalyticsPage from "./pages/ChatAnalyticsPage";
+import AgentHealthPage from "./pages/AgentHealthPage";
 
 const fieldDefs = {
   announcements: {
@@ -151,6 +156,11 @@ export default function AdminApp() {
           ))}
           <Route path="promo-banner" element={<PromoBannerPage />} />
           <Route path="footer" element={<FooterPage />} />
+          <Route path="ai-dashboard" element={<AICommandCenter />} />
+          <Route path="leads" element={<LeadsPage />} />
+          <Route path="call-center" element={<CallCenterPage />} />
+          <Route path="chat-analytics" element={<ChatAnalyticsPage />} />
+          <Route path="agent-health" element={<AgentHealthPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/admin" replace />} />

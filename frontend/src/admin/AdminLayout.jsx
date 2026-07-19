@@ -1,7 +1,8 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Image, Package, Tag, Megaphone, Menu, Footprints,
-  Sparkles, Grid3x3, Percent, LogOut, ChevronRight, Shirt
+  Sparkles, Grid3x3, Percent, LogOut, ChevronRight, Shirt,
+  Brain, Users, Phone, BarChart3, Activity,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 
@@ -20,6 +21,14 @@ const nav = [
   { path: "/admin/footer", label: "Footer", icon: Footprints },
 ];
 
+const aiNav = [
+  { path: "/admin/ai-dashboard", label: "Command Center", icon: Brain },
+  { path: "/admin/leads", label: "Lead Management", icon: Users },
+  { path: "/admin/call-center", label: "Call Center", icon: Phone },
+  { path: "/admin/chat-analytics", label: "Chat Analytics", icon: BarChart3 },
+  { path: "/admin/agent-health", label: "Agent Health", icon: Activity },
+];
+
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -27,6 +36,24 @@ export default function AdminLayout() {
   const logout = () => {
     localStorage.removeItem("fv_admin_token");
     navigate("/admin/login");
+  };
+
+  const renderNavItem = ({ path, label, icon: Icon, exact }) => {
+    const isActive = exact
+      ? location.pathname === path
+      : location.pathname.startsWith(path);
+    return (
+      <Link
+        key={path}
+        to={path}
+        className={`flex items-center gap-3 px-5 py-2.5 text-[13px] transition-colors ${
+          isActive ? "bg-white/10 text-white border-r-2 border-red-500" : "text-neutral-400 hover:text-white hover:bg-white/5"
+        }`}
+      >
+        <Icon className="w-4 h-4 shrink-0" />
+        {label}
+      </Link>
+    );
   };
 
   return (
@@ -39,23 +66,14 @@ export default function AdminLayout() {
           <div className="text-[10px] text-neutral-500 tracking-wider mt-1">ADMIN PANEL</div>
         </div>
         <nav className="flex-1 py-3 overflow-y-auto">
-          {nav.map(({ path, label, icon: Icon, exact }) => {
-            const isActive = exact
-              ? location.pathname === path
-              : location.pathname.startsWith(path);
-            return (
-              <Link
-                key={path}
-                to={path}
-                className={`flex items-center gap-3 px-5 py-2.5 text-[13px] transition-colors ${
-                  isActive ? "bg-white/10 text-white border-r-2 border-red-500" : "text-neutral-400 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                {label}
-              </Link>
-            );
-          })}
+          {nav.map(renderNavItem)}
+
+          {/* AI Agent Section */}
+          <div className="border-t border-neutral-800 my-2" />
+          <div className="text-[9px] text-neutral-600 tracking-widest uppercase px-5 py-1 font-semibold">
+            AI AGENT
+          </div>
+          {aiNav.map(renderNavItem)}
         </nav>
         <div className="p-4 border-t border-neutral-800 space-y-2">
           <Link to="/" className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white">

@@ -43,3 +43,6 @@ export const adminApi = {
 };
 
 export default api;
+
+// Re-export leadsApi for convenience
+export { leadsApi } from "./leadsApi";
