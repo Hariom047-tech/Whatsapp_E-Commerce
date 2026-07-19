@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database.connection import Base, engine
 from app.routers import dev, products, whatsapp
+from app.routers import leads
 from app.utils.logging import setup_logging
 
 settings = get_settings()
@@ -26,9 +27,13 @@ app = FastAPI(
         "AI-powered WhatsApp shopping assistant for Fashion Virus.\n\n"
         "**Flow:** Customer WhatsApp → HyperSender Webhook → AI Intent → "
         "Database Search → Product Cards → Website Link → Purchase\n\n"
-        "Configure HyperSender webhook URL to: `POST /webhook/whatsapp`"
+        "**Lead Qualification:** Every message updates lead score → "
+        "Hot leads get callback offer → AI Calling Agent (Twilio + ElevenLabs)\n\n"
+        "Configure HyperSender webhook URL to: `POST /webhook/whatsapp`\n"
+        "Configure Twilio status callback to: `POST /webhook/twilio/status`\n"
+        "Configure ElevenLabs post-call webhook to: `POST /webhook/elevenlabs`"
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -43,6 +48,7 @@ app.add_middleware(
 
 app.include_router(whatsapp.router)
 app.include_router(products.router)
+app.include_router(leads.router)
 app.include_router(dev.router)
 
 
@@ -79,10 +85,18 @@ async def health():
         "status": "ok",
         "service": s.app_name,
         "assistant": "Hariom Fashion AI",
+        "version": "2.0.0",
         "card_engine": "hariom_assistant_v1",
         "caption_has_no_urls": "http" not in sample and "localhost" not in sample,
         "hypersender_configured": bool(s.hypersender_api_key and s.hypersender_instance_id),
         "openai_configured": bool(s.openai_api_key),
+        "twilio_configured": bool(s.twilio_account_sid and s.twilio_auth_token),
+        "elevenlabs_configured": bool(s.elevenlabs_api_key and s.elevenlabs_agent_id),
+        "lead_scoring": {
+            "hot_threshold": s.lead_hot_threshold,
+            "warm_threshold": s.lead_warm_threshold,
+            "callback_cooldown_hours": s.callback_cooldown_hours,
+        },
     }
 
 
@@ -90,6 +104,9 @@ async def health():
 async def root():
     return {
         "message": f"{settings.app_name} is running",
+        "version": "2.0.0",
         "docs": "/docs",
         "webhook": "/webhook/whatsapp",
+        "leads_api": "/api/leads",
+        "leads_stats": "/api/leads/stats",
     }

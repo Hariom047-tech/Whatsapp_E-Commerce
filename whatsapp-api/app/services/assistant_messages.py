@@ -112,3 +112,69 @@ def trust_footer() -> str:
         "✅ 100% Secure Shopping\n"
         "🚚 Fast Delivery  ·  ↩️ Easy Returns  ·  💬 24x7 Support"
     )
+
+
+# ── Lead Qualification & Calling Agent Messages ──────────────
+
+
+def callback_offer() -> str:
+    """Offer a callback when lead is HOT."""
+    return (
+        "🔥 *Aapko ye products bahut pasand aa rahe hain!*\n\n"
+        "Kya aap chahte hain ki humara fashion expert aapko call karke:\n"
+        "✅ Aur better options suggest kare\n"
+        "✅ Exclusive deals bataye\n"
+        "✅ Order place karne me help kare\n\n"
+        "👇 Reply karo:\n"
+        "📞 *CALL ME* — haan, mujhe call karo\n"
+        "❌ *NO THANKS* — abhi nahi\n\n"
+        "⏱️ Call sirf 2-3 minute ka hoga, bilkul friendly chat!"
+    )
+
+
+def callback_accepted() -> str:
+    """Confirm callback accepted."""
+    return (
+        "✅ *Done! Humara fashion expert aapko jaldi call karega* 📞\n\n"
+        "Call me hum:\n"
+        "• Aapke liye best products suggest karenge\n"
+        "• Exclusive deals share karenge\n"
+        "• Order me help karenge\n\n"
+        "📱 Please apna phone ready rakhiye!"
+    )
+
+
+def callback_declined() -> str:
+    """Confirm callback declined."""
+    return (
+        "No problem 😊\n\n"
+        "Aap jab chahe yahi WhatsApp pe shopping continue kar sakte hain.\n\n"
+        "Main yahi hu aapki help ke liye! 🛍️"
+    )
+
+
+def call_followup_message(name: str, product_interest: str | None = None) -> str:
+    """WhatsApp follow-up after a call completes."""
+    greeting = f"Hi {name}" if name and name != "Customer" else "Hi"
+    product_line = ""
+    if product_interest:
+        product_line = f"\n🛍️ Aapne *{product_interest}* me interest dikhaya — "
+    return (
+        f"{greeting}! 😊\n\n"
+        f"Abhi humari call bahut achhi rahi! Thank you 🙏{product_line}\n\n"
+        "Aap yaha se direct order kar sakte hain 👇\n"
+        f"🌐 {settings.website_base_url}/shop\n\n"
+        "Koi bhi help chahiye to bus message kar dijiye! 💬"
+    )
+
+
+def lead_score_notification(chat_id: str, score: int, status: str) -> str:
+    """Admin notification for lead status change."""
+    emoji = {"cold": "❄️", "warm": "🌡️", "hot": "🔥", "converted": "✅"}.get(status, "📊")
+    return (
+        f"📊 *Lead Update*\n\n"
+        f"Chat: {chat_id}\n"
+        f"Score: *{score}/100* {emoji}\n"
+        f"Status: *{status.upper()}*"
+    )
+

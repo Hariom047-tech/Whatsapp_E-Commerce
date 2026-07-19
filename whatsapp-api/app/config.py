@@ -39,6 +39,24 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 300
     brand_name: str = "Hariom Fashion"
 
+    # Twilio (AI Calling Agent)
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_phone_number: str = ""
+
+    # ElevenLabs Conversational AI
+    elevenlabs_api_key: str = ""
+    elevenlabs_agent_id: str = ""
+    elevenlabs_phone_number_id: str = ""
+
+    # Lead scoring thresholds
+    lead_hot_threshold: int = 61
+    lead_warm_threshold: int = 31
+    callback_cooldown_hours: int = 24
+
+    # Webhook base URL for Twilio/ElevenLabs callbacks (public EC2/domain URL)
+    webhook_base_url: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

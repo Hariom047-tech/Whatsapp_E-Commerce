@@ -14,3 +14,4 @@ python-dotenv>=1.0.1
 cachetools>=5.5.0
 python-multipart>=0.0.17
 tenacity>=9.0.0
+twilio>=9.0.0

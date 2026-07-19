@@ -15,6 +15,9 @@ from app.schemas.whatsapp import WhatsAppWebhookResponse
 from app.services.ai_service import ai_service
 from app.services.assistant_messages import (
     browse_all,
+    callback_accepted,
+    callback_declined,
+    callback_offer,
     confused_help,
     format_price_reply,
     format_size_available,
@@ -27,7 +30,9 @@ from app.services.assistant_messages import (
     upsell_jeans,
     welcome_greeting,
 )
+from app.services.calling_agent_service import calling_agent_service
 from app.services.hypersender_service import hypersender_service
+from app.services.lead_scoring_service import lead_scoring_service
 from app.services.product_card_service import send_product_card
 from app.services.product_search import product_search_service
 from app.services.webhook_parser import parse_incoming_message
@@ -111,35 +116,70 @@ async def _process_message(chat_id: str, text: str, sender_name: str | None, db:
     intent = ai_service.extract_intent(text, history)
     logger.info("AI intent: %s", intent.model_dump(exclude_none=True))
 
-    # --- Non-search intents ---
+    # ── Callback accept / decline (must be checked first) ────
+    if intent.intent_type == "callback_accept":
+        lead = lead_scoring_service.get_or_create_lead(db, chat_id, sender_name)
+        lead_scoring_service.update_lead(db, chat_id, sender_name, intent)
+        lead_scoring_service.mark_callback_accepted(db, lead)
+        await hypersender_service.send_text(chat_id, callback_accepted())
+
+        # Initiate the call
+        webhook_base_url = settings.public_website_base_url or settings.webhook_base_url
+        if webhook_base_url:
+            call_log = await calling_agent_service.initiate_call(db, lead, webhook_base_url)
+            if call_log:
+                logger.info("Call initiated for %s after callback accept, SID=%s", chat_id, call_log.call_sid)
+            else:
+                logger.warning("Call initiation failed for %s — Twilio/ElevenLabs may not be configured", chat_id)
+        else:
+            logger.warning("No webhook_base_url configured — cannot initiate call for %s", chat_id)
+
+        await hypersender_service.stop_typing(chat_id)
+        return 0
+
+    if intent.intent_type == "callback_decline":
+        lead = lead_scoring_service.get_or_create_lead(db, chat_id, sender_name)
+        lead_scoring_service.update_lead(db, chat_id, sender_name, intent)
+        lead_scoring_service.mark_callback_declined(db, lead)
+        await hypersender_service.send_text(chat_id, callback_declined())
+        await hypersender_service.stop_typing(chat_id)
+        return 0
+
+    # ── Non-search intents ───────────────────────────────────
     if intent.intent_type == "greeting":
+        lead_scoring_service.update_lead(db, chat_id, sender_name, intent)
         await hypersender_service.send_text(chat_id, intent.clarification_question or welcome_greeting())
         _save_state(db, chat_id, text, ConversationState(intent=intent))
         await hypersender_service.stop_typing(chat_id)
         return 0
 
     if intent.intent_type == "purchase_intent":
+        lead_scoring_service.update_lead(db, chat_id, sender_name, intent)
         await hypersender_service.send_text(chat_id, intent.reply_message or purchase_help())
         await hypersender_service.stop_typing(chat_id)
         return 0
 
     if intent.intent_type == "confused":
+        lead_scoring_service.update_lead(db, chat_id, sender_name, intent)
         await hypersender_service.send_text(chat_id, intent.reply_message or confused_help())
         await hypersender_service.stop_typing(chat_id)
         return 0
 
     if intent.intent_type == "browse":
+        lead_scoring_service.update_lead(db, chat_id, sender_name, intent)
         await hypersender_service.send_text(chat_id, browse_all())
         await hypersender_service.stop_typing(chat_id)
         return 0
 
     if intent.intent_type in ("price_query", "size_query"):
+        lead_scoring_service.update_lead(db, chat_id, sender_name, intent)
         reply = _reply_from_last_products(state, intent) or intent.reply_message
         await hypersender_service.send_text(chat_id, reply or "Kya product ke baare me puchna hai? 😊")
         await hypersender_service.stop_typing(chat_id)
         return 0
 
     if intent.intent_type in ("clarify", "unknown"):
+        lead_scoring_service.update_lead(db, chat_id, sender_name, intent)
         reply = intent.clarification_question or intent.reply_message or confused_help()
         await hypersender_service.send_text(chat_id, reply)
         _save_state(db, chat_id, text, ConversationState(intent=intent))
@@ -149,6 +189,7 @@ async def _process_message(chat_id: str, text: str, sender_name: str | None, db:
     # Quick action shortcuts
     lower = text.lower()
     if "view all" in lower or "browse" in lower:
+        lead_scoring_service.update_lead(db, chat_id, sender_name, intent)
         await hypersender_service.send_text(chat_id, browse_all())
         await hypersender_service.stop_typing(chat_id)
         return 0
@@ -156,10 +197,11 @@ async def _process_message(chat_id: str, text: str, sender_name: str | None, db:
     if "jeans" in lower and ("haan" in lower or "yes" in lower or "dikhao" in lower):
         intent = ShoppingIntent(intent_type="search", category="jeans", query_text=text)
 
-    # --- Product search ---
+    # ── Product search ───────────────────────────────────────
     result = product_search_service.search(db, intent, limit=settings.max_products_per_reply)
 
     if not result.products:
+        lead_scoring_service.update_lead(db, chat_id, sender_name, intent)
         await hypersender_service.send_text(chat_id, no_products_found() + trust_footer())
         _save_state(db, chat_id, text, ConversationState(intent=intent, last_products=[]))
         await hypersender_service.stop_typing(chat_id)
@@ -169,11 +211,13 @@ async def _process_message(chat_id: str, text: str, sender_name: str | None, db:
     await asyncio.sleep(1.0)
 
     sent = 0
+    product_prices: list[float] = []
     for i, product in enumerate(result.products):
         try:
             delivery = await send_product_card(chat_id, product)
             if delivery.image_sent or delivery.fallback_text:
                 sent += 1
+            product_prices.append(float(product.discount_price or product.price or 0))
             if i < len(result.products) - 1:
                 await asyncio.sleep(1.5)
         except Exception as exc:
@@ -186,6 +230,16 @@ async def _process_message(chat_id: str, text: str, sender_name: str | None, db:
         ConversationState(intent=intent, last_products=_products_to_dict(result.products)),
     )
 
+    # ── Update lead score with product data ──────────────────
+    lead = lead_scoring_service.update_lead(
+        db,
+        chat_id,
+        sender_name,
+        intent,
+        products_shown=sent,
+        product_prices=product_prices,
+    )
+
     # Upsell when customer searched shirts
     cat = (intent.category or "").lower()
     if cat in ("shirt", "shirts", "t-shirt", "polo", "overshirt"):
@@ -193,6 +247,18 @@ async def _process_message(chat_id: str, text: str, sender_name: str | None, db:
         await hypersender_service.send_text(chat_id, upsell_jeans())
 
     await hypersender_service.send_text(chat_id, quick_actions_footer() + trust_footer())
+
+    # ── Offer callback if lead is HOT ────────────────────────
+    if lead_scoring_service.should_offer_callback(lead):
+        await asyncio.sleep(1.0)
+        await hypersender_service.send_text(chat_id, callback_offer())
+        lead_scoring_service.mark_callback_offered(db, lead)
+        logger.info(
+            "Callback offered to HOT lead: %s (score=%d)",
+            chat_id,
+            lead.lead_score,
+        )
+
     await hypersender_service.stop_typing(chat_id)
     return sent
 

@@ -30,6 +30,8 @@ RULES:
 - intent_type="price_query" for kitne ka / price / cost questions.
 - intent_type="size_query" for size availability questions (XL hai? size M?).
 - intent_type="unknown" only if truly unclear.
+- intent_type="callback_accept" when customer says yes to a callback/call offer (e.g., "call me", "haan call karo", "yes please call", "CALL ME", "haan", "call kardo", "mujhe call karo", "ok call me").
+- intent_type="callback_decline" when customer declines a callback/call offer (e.g., "no thanks", "nahi", "no call", "abhi nahi", "I'm fine", "nahi chahiye", "mat karo call").
 
 EXTRACT for search: category, subcategory, color, size, max_price, min_price, occasion, style.
 Categories: shirt, t-shirt, jeans, trousers, cargo-pants, shorts, shoes, overshirt, polo, jacket.
@@ -41,7 +43,7 @@ For price_query/size_query: set reply_message null — backend uses last shown p
 
 Respond ONLY with valid JSON:
 {{
-  "intent_type": "search|clarify|greeting|unknown|purchase_intent|confused|browse|price_query|size_query",
+  "intent_type": "search|clarify|greeting|unknown|purchase_intent|confused|browse|price_query|size_query|callback_accept|callback_decline",
   "category": string|null,
   "subcategory": string|null,
   "color": string|null,
@@ -103,6 +105,12 @@ class AIService:
 
     def _extract_with_rules(self, message: str) -> ShoppingIntent:
         text = message.lower().strip()
+
+        # Callback response detection (must be checked first)
+        if any(w in text for w in ("call me", "call karo", "haan call", "call kardo", "please call", "mujhe call", "mujhe call karo")):
+            return ShoppingIntent(intent_type="callback_accept")
+        if any(w in text for w in ("no call", "call nahi", "no thanks", "nahi chahiye call", "abhi nahi", "dont call", "mat karo call")):
+            return ShoppingIntent(intent_type="callback_decline")
 
         if re.search(r"\b(hi{1,3}|hello|hey|namaste|good\s*(morning|evening|afternoon))\b", text):
             return ShoppingIntent(intent_type="greeting", clarification_question=welcome_greeting())

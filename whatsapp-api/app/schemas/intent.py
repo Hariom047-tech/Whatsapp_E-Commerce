@@ -15,6 +15,8 @@ IntentType = Literal[
     "browse",
     "price_query",
     "size_query",
+    "callback_accept",
+    "callback_decline",
 ]
 
 
